@@ -1,0 +1,110 @@
+<div class="container">
+    <h1>Sistema de Votación de la Nación</h1>
+    
+    <div class="confirmation-card">
+        <h2>Votación</h2>
+        
+        <div class="party-header">
+            <h3>La Libertad Avanza</h3>
+        </div>
+
+        <div class="candidate-details">
+            <div class="candidate-role">
+                <h4>Presidente</h4>
+                <div class="candidate">
+                    <img src="/placeholder-avatar.png" alt="Javier Milei" class="candidate-image" />
+                    <span>Javier Milei</span>
+                </div>
+            </div>
+
+            <div class="candidate-role">
+                <h4>Vicepresidente</h4>
+                <div class="candidate">
+                    <img src="/placeholder-avatar.png" alt="Victoria Villarruel" class="candidate-image" />
+                    <span>Victoria Villarruel</span>
+                </div>
+            </div>
+
+            <div class="candidate-role">
+                <h4>Cargo</h4>
+                <div class="candidate">
+                    <img src="/placeholder-avatar.png" alt="Nombre y Apellido" class="candidate-image" />
+                    <span>Nombre y Apellido</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="vote-button">Votar</button>
+    </div>
+</div>
+
+<style>
+    .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2rem;
+    }
+
+    .confirmation-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 500px;
+    }
+
+    h1, h2 {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .party-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .candidate-details {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .candidate-role {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .candidate {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.5rem;
+        border: 1px solid #eee;
+        border-radius: 0.5rem;
+    }
+
+    .candidate-image {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+    }
+
+    .vote-button {
+        width: 100%;
+        padding: 0.75rem;
+        background-color: #4A90E2;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+
+    .vote-button:hover {
+        background-color: #357ABD;
+    }
+</style> 

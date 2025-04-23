@@ -1,0 +1,104 @@
+<div class="container">
+    <h1>Sistema de Votación de la Nación</h1>
+    
+    <div class="voting-card">
+        <h2>Votación</h2>
+        
+        <div class="candidates">
+            <div class="candidate">
+                <img src="/placeholder-avatar.png" alt="Javier Milei" class="candidate-image" />
+                <div class="candidate-info">
+                    <span class="candidate-name">Javier Milei</span>
+                    <span class="party-name">La Libertad Avanza</span>
+                </div>
+                <button class="vote-button">Ver Lista</button>
+            </div>
+            
+            <div class="candidate">
+                <img src="/placeholder-avatar.png" alt="Sergio Massa" class="candidate-image" />
+                <div class="candidate-info">
+                    <span class="candidate-name">Sergio Massa</span>
+                    <span class="party-name">Unión por la Patria</span>
+                </div>
+                <button class="vote-button">Ver Lista</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2rem;
+    }
+
+    .voting-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 500px;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    h2 {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .candidates {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .candidate {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border: 1px solid #eee;
+        border-radius: 0.5rem;
+    }
+
+    .candidate-image {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        margin-right: 1rem;
+    }
+
+    .candidate-info {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .candidate-name {
+        font-weight: bold;
+    }
+
+    .party-name {
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .vote-button {
+        padding: 0.5rem 1.5rem;
+        background-color: #4A90E2;
+        color: white;
+        border: none;
+        border-radius: 2rem;
+        cursor: pointer;
+    }
+
+    .vote-button:hover {
+        background-color: #357ABD;
+    }
+</style> 

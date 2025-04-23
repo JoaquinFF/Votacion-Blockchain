@@ -1,0 +1,89 @@
+<div class="container">
+    <h1>Sistema de Votación de la Nación</h1>
+    
+    <div class="results-card">
+        <h2>Resultados</h2>
+        
+        <div class="results-list">
+            <div class="result-item">
+                <div class="party-info">
+                    <span>La Libertad Avanza</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress" style="width: 62%;"></div>
+                </div>
+                <span class="percentage">62%</span>
+            </div>
+
+            <div class="result-item">
+                <div class="party-info">
+                    <span>Unión por la Patria</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress" style="width: 38%;"></div>
+                </div>
+                <span class="percentage">38%</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2rem;
+    }
+
+    .results-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 500px;
+    }
+
+    h1, h2 {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .results-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .result-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .party-info {
+        width: 150px;
+        font-weight: 500;
+    }
+
+    .progress-bar {
+        flex-grow: 1;
+        height: 24px;
+        background-color: #f0f0f0;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .progress {
+        height: 100%;
+        background-color: #4A90E2;
+        transition: width 0.3s ease;
+    }
+
+    .percentage {
+        width: 50px;
+        text-align: right;
+        font-weight: 500;
+    }
+</style> 

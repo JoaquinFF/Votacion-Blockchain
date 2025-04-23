@@ -1,0 +1,111 @@
+<div class="container">
+    <h1>Bienvenido al sistema de Votación de la Nación</h1>
+    
+    <div class="validador-card">
+        <h2>Validador de Identidad</h2>
+        
+        <div class="input-group">
+            <label for="dni">DNI</label>
+            <input type="text" id="dni" name="dni" />
+        </div>
+
+        <div class="buttons-container">
+            <button class="photo-button">
+                <span>+</span>
+                <p>Agregar foto del DNI</p>
+            </button>
+            <button class="photo-button">
+                <span>+</span>
+                <p>Tomarme una Foto</p>
+            </button>
+        </div>
+
+        <button class="validate-button">Validarme</button>
+    </div>
+</div>
+
+<style>
+    .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2rem;
+    }
+
+    .validador-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 400px;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    h2 {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .input-group {
+        margin-bottom: 1.5rem;
+    }
+
+    input {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+    }
+
+    .buttons-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .photo-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        border: 2px dashed #ccc;
+        border-radius: 0.5rem;
+        background: none;
+        cursor: pointer;
+    }
+
+    .photo-button span {
+        font-size: 2rem;
+        color: #666;
+    }
+
+    .photo-button p {
+        margin: 0;
+        font-size: 0.8rem;
+        color: #666;
+        text-align: center;
+    }
+
+    .validate-button {
+        width: 100%;
+        padding: 0.75rem;
+        background-color: #4A90E2;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+
+    .validate-button:hover {
+        background-color: #357ABD;
+    }
+</style> 

@@ -1,0 +1,81 @@
+---
+interface Props {
+	title?: string;
+}
+
+const { title = 'Sistema de Votación de la Nación' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="Sistema de Votación de la Nación" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+	</head>
+	<body>
+		<slot />
+	</body>
+</html>
+
+<style is:global>
+	:root {
+		--font-primary: 'Inter', system-ui, sans-serif;
+		--accent: #4A90E2;
+		--accent-hover: #357ABD;
+		--text-primary: #333333;
+		--text-secondary: #666666;
+		--background: #f5f5f5;
+	}
+	
+	* {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
+
+	html {
+		font-family: var(--font-primary);
+		background: var(--background);
+		color: var(--text-primary);
+	}
+
+	body {
+		min-height: 100vh;
+		line-height: 1.5;
+	}
+
+	h1, h2, h3, h4, h5, h6 {
+		font-family: var(--font-primary);
+		font-weight: 600;
+		line-height: 1.2;
+	}
+
+	h1 {
+		font-size: 2rem;
+		font-weight: 700;
+	}
+
+	h2 {
+		font-size: 1.5rem;
+	}
+
+	p {
+		color: var(--text-secondary);
+	}
+
+	button {
+		font-family: var(--font-primary);
+		font-weight: 500;
+	}
+
+	input {
+		font-family: var(--font-primary);
+	}
+</style>
