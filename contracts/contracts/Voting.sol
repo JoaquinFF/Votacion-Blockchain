@@ -58,7 +58,7 @@ contract Voting {
     }
 
     function getCandidate(uint _id) public view returns (string memory, uint) {
-        Candidate memory c = candidates[_id];
-        return (c.name, c.voteCount);
+    Candidate memory c = candidates[_id];
+    return (c.name, c.voteCount);
     }
 }
