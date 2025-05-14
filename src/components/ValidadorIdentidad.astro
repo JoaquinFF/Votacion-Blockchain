@@ -6,23 +6,420 @@
         
         <div class="input-group">
             <label for="dni">DNI</label>
-            <input type="text" id="dni" name="dni" />
+            <input type="text" id="dni" name="dni" placeholder="Ingrese su número de DNI" />
+        </div>
+
+        <div class="status-container">
+            <div id="dni-status" class="status-item">
+                <span class="status-icon">⏳</span>
+                <span class="status-text">DNI no validado</span>
+            </div>
+            <div id="photo-status" class="status-item">
+                <span class="status-icon">⏳</span>
+                <span class="status-text">Fotos no validadas</span>
+            </div>
         </div>
 
         <div class="buttons-container">
-            <button class="photo-button">
-                <span>+</span>
-                <p>Agregar foto del DNI</p>
-            </button>
-            <button class="photo-button">
-                <span>+</span>
-                <p>Tomarme una Foto</p>
-            </button>
+            <div class="photo-options">
+                <h3>Foto del DNI</h3>
+                <div class="photo-buttons">
+                    <button class="photo-button" id="cameraDni">
+                        <span>📷</span>
+                        <p>Tomar foto del DNI</p>
+                    </button>
+                    <button class="photo-button" id="uploadDni">
+                        <span>📁</span>
+                        <p>Subir foto del DNI</p>
+                    </button>
+                </div>
+            </div>
+            <div class="photo-options">
+                <h3>Foto Personal</h3>
+                <button class="photo-button" id="cameraSelfie">
+                    <span>📷</span>
+                    <p>Tomar Selfie</p>
+                </button>
+            </div>
+        </div>
+
+        <div id="preview-container" class="preview-container" style="display: none;">
+            <img id="preview-image" src="" alt="Vista previa" />
+            <button id="retake-photo" class="retake-button">Volver a tomar</button>
+        </div>
+
+        <div id="camera-container" class="camera-container" style="display: none;">
+            <video id="camera-preview" autoplay playsinline></video>
+            <button id="capture-photo" class="capture-button">Capturar Foto</button>
+            <button id="cancel-camera" class="cancel-button">Cancelar</button>
         </div>
 
         <button class="validate-button">Validarme</button>
     </div>
 </div>
+
+<script>
+    console.log('Script iniciando...');
+
+    // Importaciones dinámicas
+    let Tesseract;
+    let faceapi;
+
+    // Cargar módulos
+    async function loadModules() {
+        try {
+            Tesseract = await import('tesseract.js');
+            faceapi = await import('face-api.js');
+            console.log('Módulos cargados correctamente');
+        } catch (error) {
+            console.error('Error al cargar módulos:', error);
+        }
+    }
+
+    // Variables globales
+    let currentPhotoType = null;
+    let stream = null;
+    let dniImage = null;
+    let selfieImage = null;
+    let dniNumber = '';
+    let modelsLoaded = false;
+
+    // Cargar modelos de face-api
+    async function loadModels() {
+        if (!modelsLoaded && faceapi) {
+            try {
+                await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+                await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+                await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+                modelsLoaded = true;
+                console.log('Modelos cargados correctamente');
+            } catch (error) {
+                console.error('Error al cargar modelos:', error);
+                alert('Error al cargar los modelos de reconocimiento facial');
+            }
+        }
+    }
+
+    // Función para detectar y extraer el descriptor facial
+    async function getFaceDescriptor(imageData: string): Promise<Float32Array | null> {
+        try {
+            const img = await faceapi.fetchImage(imageData);
+            const detections = await faceapi.detectSingleFace(img)
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!detections) {
+                throw new Error('No se detectó un rostro en la imagen');
+            }
+
+            return detections.descriptor;
+        } catch (error) {
+            console.error('Error al detectar rostro:', error);
+            return null;
+        }
+    }
+
+    // Función para comparar descriptores faciales
+    function compareFaceDescriptors(desc1: Float32Array, desc2: Float32Array): number {
+        return faceapi.euclideanDistance(desc1, desc2);
+    }
+
+    // Función para actualizar el estado de validación
+    function updateValidationStatus(type: 'dni' | 'photo', status: 'pending' | 'valid' | 'invalid', message: string) {
+        const statusElement = document.getElementById(`${type}-status`);
+        if (statusElement) {
+            const icon = statusElement.querySelector('.status-icon');
+            const text = statusElement.querySelector('.status-text');
+            
+            if (icon && text) {
+                switch (status) {
+                    case 'pending':
+                        icon.textContent = '⏳';
+                        break;
+                    case 'valid':
+                        icon.textContent = '✅';
+                        break;
+                    case 'invalid':
+                        icon.textContent = '❌';
+                        break;
+                }
+                text.textContent = message;
+            }
+        }
+    }
+
+    // Función para validar la identidad
+    async function validateIdentity() {
+        if (!dniImage || !selfieImage || !dniNumber) {
+            alert('Por favor, complete todos los campos requeridos');
+            return;
+        }
+
+        try {
+            const validateButton = document.querySelector('.validate-button') as HTMLButtonElement;
+            validateButton.disabled = true;
+            validateButton.textContent = 'Validando...';
+
+            // Validar DNI
+            updateValidationStatus('dni', 'pending', 'Validando número de DNI...');
+            const dniText = await extractTextFromImage(dniImage);
+            console.log('Texto extraído del DNI:', dniText);
+
+            const dniFound = dniText.includes(dniNumber);
+            if (!dniFound) {
+                updateValidationStatus('dni', 'invalid', 'DNI no coincide con el documento');
+                alert('El número de DNI no coincide con el documento');
+                validateButton.disabled = false;
+                validateButton.textContent = 'Validarme';
+                return;
+            }
+            updateValidationStatus('dni', 'valid', 'DNI validado correctamente');
+
+            // Validar fotos
+            updateValidationStatus('photo', 'pending', 'Validando similitud facial...');
+            
+            // Obtener descriptores faciales
+            const dniFaceDescriptor = await getFaceDescriptor(dniImage);
+            const selfieFaceDescriptor = await getFaceDescriptor(selfieImage);
+
+            if (!dniFaceDescriptor || !selfieFaceDescriptor) {
+                updateValidationStatus('photo', 'invalid', 'No se detectaron rostros en las imágenes');
+                alert('No se pudieron detectar rostros en las imágenes. Por favor, intente nuevamente.');
+                validateButton.disabled = false;
+                validateButton.textContent = 'Validarme';
+                return;
+            }
+
+            // Comparar descriptores faciales
+            const distance = compareFaceDescriptors(dniFaceDescriptor, selfieFaceDescriptor);
+            console.log('Distancia facial:', distance);
+
+            // La distancia debe ser menor a 0.6 para considerar que es la misma persona
+            if (distance < 0.6) {
+                updateValidationStatus('photo', 'valid', 'Fotos validadas correctamente');
+                alert('¡Identidad validada con éxito!');
+                window.location.href = '/votacion';
+            } else {
+                updateValidationStatus('photo', 'invalid', 'Las fotos no coinciden');
+                alert('La validación de identidad falló. Las fotos no corresponden a la misma persona.');
+            }
+        } catch (error) {
+            console.error('Error en la validación:', error);
+            alert('Ocurrió un error durante la validación. Por favor, intente nuevamente.');
+        } finally {
+            const validateButton = document.querySelector('.validate-button') as HTMLButtonElement;
+            validateButton.disabled = false;
+            validateButton.textContent = 'Validarme';
+        }
+    }
+
+    // Función para extraer texto de la imagen usando Tesseract
+    async function extractTextFromImage(imageData: string): Promise<string> {
+        try {
+            const result = await Tesseract.recognize(
+                imageData,
+                'spa', // Idioma español
+                {
+                    logger: m => console.log(m)
+                }
+            );
+            return result.data.text;
+        } catch (error) {
+            console.error('Error al extraer texto:', error);
+            throw new Error('No se pudo extraer el texto de la imagen');
+        }
+    }
+
+    // Función para manejar la captura de foto
+    async function handleCameraCapture(photoType: string) {
+        console.log('Iniciando captura de cámara:', photoType);
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: photoType === 'selfie' ? { facingMode: 'user' } : true 
+            });
+            
+            const video = document.getElementById('camera-preview') as HTMLVideoElement;
+            if (video) {
+                video.srcObject = stream;
+                document.getElementById('camera-container').style.display = 'block';
+                currentPhotoType = photoType;
+            }
+        } catch (error) {
+            console.error('Error al acceder a la cámara:', error);
+            alert('No se pudo acceder a la cámara. Por favor, asegúrese de dar los permisos necesarios.');
+        }
+    }
+
+    // Función para capturar la foto
+    function capturePhoto() {
+        console.log('Capturando foto...');
+        const video = document.getElementById('camera-preview') as HTMLVideoElement;
+        if (!video) return;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx) {
+            ctx.drawImage(video, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg');
+            const previewImage = document.getElementById('preview-image') as HTMLImageElement;
+            if (previewImage) {
+                previewImage.src = imageData;
+
+                // Guardar la imagen según el tipo
+                if (currentPhotoType === 'dni') {
+                    dniImage = imageData;
+                } else if (currentPhotoType === 'selfie') {
+                    selfieImage = imageData;
+                }
+
+                // Detener la cámara y ocultar el contenedor
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                document.getElementById('camera-container').style.display = 'none';
+                document.getElementById('preview-container').style.display = 'block';
+            }
+        }
+    }
+
+    // Función para manejar la subida de archivo
+    function handleFileUpload(photoType: string) {
+        console.log('Iniciando subida de archivo:', photoType);
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        
+        input.onchange = (e) => {
+            const target = e.target as HTMLInputElement;
+            const file = target.files?.[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const imageData = event.target?.result as string;
+                    const previewImage = document.getElementById('preview-image') as HTMLImageElement;
+                    if (previewImage) {
+                        previewImage.src = imageData;
+                        document.getElementById('preview-container').style.display = 'block';
+                        
+                        // Guardar la imagen según el tipo
+                        if (photoType === 'dni') {
+                            dniImage = imageData;
+                        }
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+        
+        input.click();
+    }
+
+    // Función para cancelar la captura
+    function cancelCamera() {
+        console.log('Cancelando captura...');
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+        document.getElementById('camera-container').style.display = 'none';
+    }
+
+    // Función para volver a tomar la foto
+    function retakePhoto() {
+        console.log('Volviendo a tomar foto...');
+        document.getElementById('preview-container').style.display = 'none';
+    }
+
+    // Función para configurar los event listeners
+    function setupEventListeners() {
+        console.log('Configurando event listeners...');
+        
+        // Botones de DNI
+        const cameraDniBtn = document.getElementById('cameraDni');
+        const uploadDniBtn = document.getElementById('uploadDni');
+        const cameraSelfieBtn = document.getElementById('cameraSelfie');
+        const capturePhotoBtn = document.getElementById('capture-photo');
+        const cancelCameraBtn = document.getElementById('cancel-camera');
+        const retakePhotoBtn = document.getElementById('retake-photo');
+        const validateBtn = document.querySelector('.validate-button');
+        const dniInput = document.getElementById('dni');
+
+        console.log('Elementos encontrados:', {
+            cameraDniBtn: !!cameraDniBtn,
+            uploadDniBtn: !!uploadDniBtn,
+            cameraSelfieBtn: !!cameraSelfieBtn,
+            capturePhotoBtn: !!capturePhotoBtn,
+            cancelCameraBtn: !!cancelCameraBtn,
+            retakePhotoBtn: !!retakePhotoBtn,
+            validateBtn: !!validateBtn,
+            dniInput: !!dniInput
+        });
+
+        // Botones de DNI
+        cameraDniBtn?.addEventListener('click', () => {
+            console.log('Botón cámara DNI clickeado');
+            handleCameraCapture('dni');
+        });
+        
+        uploadDniBtn?.addEventListener('click', () => {
+            console.log('Botón subir DNI clickeado');
+            handleFileUpload('dni');
+        });
+        
+        // Botón de selfie
+        cameraSelfieBtn?.addEventListener('click', () => {
+            console.log('Botón selfie clickeado');
+            handleCameraCapture('selfie');
+        });
+        
+        // Botones de cámara
+        capturePhotoBtn?.addEventListener('click', () => {
+            console.log('Botón capturar clickeado');
+            capturePhoto();
+        });
+        
+        cancelCameraBtn?.addEventListener('click', () => {
+            console.log('Botón cancelar clickeado');
+            cancelCamera();
+        });
+        
+        retakePhotoBtn?.addEventListener('click', () => {
+            console.log('Botón retomar clickeado');
+            retakePhoto();
+        });
+        
+        // Campo DNI
+        dniInput?.addEventListener('input', (e) => {
+            dniNumber = (e.target as HTMLInputElement).value;
+        });
+        
+        // Botón de validación
+        validateBtn?.addEventListener('click', validateIdentity);
+    }
+
+    // Inicialización
+    async function initialize() {
+        console.log('Inicializando...');
+        await loadModules();
+        await loadModels();
+        setupEventListeners();
+        console.log('Inicialización completada');
+    }
+
+    // Iniciar cuando el DOM esté listo
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+
+    // También intentar con el evento de Astro
+    document.addEventListener('astro:page-load', initialize);
+
+    console.log('Script cargado completamente');
+</script>
 
 <style>
     .container {
@@ -57,10 +454,17 @@
 
     input {
         width: 100%;
-        padding: 0.5rem;
+        padding: 0.75rem;
         border: 1px solid #ccc;
         border-radius: 0.5rem;
         font-size: 1rem;
+        margin-top: 0.5rem;
+    }
+
+    input:focus {
+        outline: none;
+        border-color: #4A90E2;
+        box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
     }
 
     .buttons-container {
@@ -107,5 +511,121 @@
 
     .validate-button:hover {
         background-color: #357ABD;
+    }
+
+    .validate-button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+    }
+
+    .photo-options {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .photo-options h3 {
+        font-size: 1rem;
+        margin: 0;
+        color: #333;
+    }
+
+    .photo-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+
+    .preview-container {
+        margin: 1rem 0;
+        text-align: center;
+    }
+
+    .preview-container img {
+        max-width: 100%;
+        max-height: 200px;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .retake-button {
+        padding: 0.5rem 1rem;
+        background-color: #666;
+        color: white;
+        border: none;
+        border-radius: 0.25rem;
+        cursor: pointer;
+    }
+
+    .retake-button:hover {
+        background-color: #555;
+    }
+
+    .camera-container {
+        margin: 1rem 0;
+        text-align: center;
+    }
+
+    #camera-preview {
+        width: 100%;
+        max-width: 400px;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .capture-button {
+        padding: 0.75rem 1.5rem;
+        background-color: #4A90E2;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+        margin-right: 0.5rem;
+    }
+
+    .capture-button:hover {
+        background-color: #357ABD;
+    }
+
+    .cancel-button {
+        padding: 0.75rem 1.5rem;
+        background-color: #666;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+
+    .cancel-button:hover {
+        background-color: #555;
+    }
+
+    .status-container {
+        margin: 1rem 0;
+        padding: 1rem;
+        background-color: #f5f5f5;
+        border-radius: 0.5rem;
+    }
+
+    .status-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .status-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .status-icon {
+        margin-right: 0.5rem;
+        font-size: 1.2rem;
+    }
+
+    .status-text {
+        font-size: 0.9rem;
+        color: #666;
     }
 </style> 
