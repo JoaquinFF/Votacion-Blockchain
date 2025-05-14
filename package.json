@@ -10,5 +10,8 @@
   },
   "dependencies": {
     "astro": "^5.7.5"
+  },
+  "devDependencies": {
+    "hardhat": "^2.24.0"
   }
 }
