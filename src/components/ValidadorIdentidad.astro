@@ -20,6 +20,20 @@
             </div>
         </div>
 
+       <div id="qr-container" class="qr-container">
+            <h3>Escanea el código QR con tu celular</h3>
+            <div id="qrcode"></div>
+            <p class="qr-instructions">1. Escanea el código QR con tu celular<br>
+               2. Toma una foto de tu DNI<br>
+               3. Toma una selfie<br>
+               4. Espera la validación</p>
+        </div> 
+
+        <div id="mobile-status" class="mobile-status" style="display: none;">
+            <p>Conectado al celular</p>
+            <div class="loading-spinner"></div>
+        </div>
+
         <div class="buttons-container">
             <div class="photo-options">
                 <h3>Foto del DNI</h3>
@@ -64,6 +78,8 @@
     // Importaciones dinámicas
     let Tesseract;
     let faceapi;
+    import { toCanvas } from 'qrcode';
+    import { io } from 'socket.io-client';
 
     // Cargar módulos
     async function loadModules() {
@@ -83,6 +99,8 @@
     let selfieImage = null;
     let dniNumber = '';
     let modelsLoaded = false;
+    let socket;
+    let sessionId;
 
     // Cargar modelos de face-api
     async function loadModels() {
@@ -148,6 +166,73 @@
         }
     }
 
+    // Generar ID de sesión único
+    function generateSessionId() {
+        return Math.random().toString(36).substring(2, 15);
+    }
+
+    // Inicializar QR
+    async function initializeQR() {
+        sessionId = generateSessionId();
+        const qrData = `http://192.168.1.37:4321/mobile?sessionId=${sessionId}`;
+        
+        try {
+            const qrElement = document.getElementById('qrcode');
+            if (!qrElement) {
+                console.error('No se encontró el elemento qrcode');
+                return;
+            }
+            // Limpiar el contenedor antes de generar el nuevo QR
+            qrElement.innerHTML = '';
+            // Crear un canvas y agregarlo al contenedor
+            const canvas = document.createElement('canvas');
+            qrElement.appendChild(canvas);
+            // Renderizar el QR en el canvas
+            await toCanvas(canvas, qrData, {
+                width: 200,
+                margin: 1,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            });
+            console.log('QR generado exitosamente');
+        } catch (err) {
+            console.error('Error generando QR:', err);
+        }
+    }
+
+    // Inicializar Socket.IO
+    function initializeSocket() {
+        socket = io(window.location.origin);
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor');
+        });
+
+        socket.on('mobile-connected', () => {
+            document.getElementById('mobile-status').style.display = 'block';
+            document.getElementById('qr-container').style.display = 'none';
+        });
+
+        socket.on('photos-received', async (data) => {
+            dniImage = data.dniImage;
+            selfieImage = data.selfieImage;
+            
+            // Actualizar estado visual
+            document.getElementById('dni-status').querySelector('.status-icon').textContent = '✅';
+            document.getElementById('photo-status').querySelector('.status-icon').textContent = '✅';
+            
+            // Habilitar botón de validación
+            (document.querySelector('.validate-button') as HTMLButtonElement).disabled = false;
+        });
+
+        socket.on('disconnect', () => {
+            document.getElementById('mobile-status').style.display = 'none';
+            document.getElementById('qr-container').style.display = 'block';
+        });
+    }
+
     // Función para validar la identidad
     async function validateIdentity() {
         if (!dniImage || !selfieImage || !dniNumber) {
@@ -155,59 +240,36 @@
             return;
         }
 
+        const validateButton = document.querySelector('.validate-button') as HTMLButtonElement;
+
         try {
-            const validateButton = document.querySelector('.validate-button') as HTMLButtonElement;
             validateButton.disabled = true;
             validateButton.textContent = 'Validando...';
 
-            // Validar DNI
-            updateValidationStatus('dni', 'pending', 'Validando número de DNI...');
-            const dniText = await extractTextFromImage(dniImage);
-            console.log('Texto extraído del DNI:', dniText);
+            const response = await fetch('/api/validar-usuario', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    dni: dniNumber,
+                    selfieImage: selfieImage
+                })
+            });
 
-            const dniFound = dniText.includes(dniNumber);
-            if (!dniFound) {
-                updateValidationStatus('dni', 'invalid', 'DNI no coincide con el documento');
-                alert('El número de DNI no coincide con el documento');
-                validateButton.disabled = false;
-                validateButton.textContent = 'Validarme';
-                return;
-            }
-            updateValidationStatus('dni', 'valid', 'DNI validado correctamente');
+            const data = await response.json();
 
-            // Validar fotos
-            updateValidationStatus('photo', 'pending', 'Validando similitud facial...');
-            
-            // Obtener descriptores faciales
-            const dniFaceDescriptor = await getFaceDescriptor(dniImage);
-            const selfieFaceDescriptor = await getFaceDescriptor(selfieImage);
-
-            if (!dniFaceDescriptor || !selfieFaceDescriptor) {
-                updateValidationStatus('photo', 'invalid', 'No se detectaron rostros en las imágenes');
-                alert('No se pudieron detectar rostros en las imágenes. Por favor, intente nuevamente.');
+            if (!data.success) {
+                alert(data.message);
                 validateButton.disabled = false;
                 validateButton.textContent = 'Validarme';
                 return;
             }
 
-            // Comparar descriptores faciales
-            const distance = compareFaceDescriptors(dniFaceDescriptor, selfieFaceDescriptor);
-            console.log('Distancia facial:', distance);
+            alert('¡Identidad validada con éxito!');
+            window.location.href = '/votacion';
 
-            // La distancia debe ser menor a 0.6 para considerar que es la misma persona
-            if (distance < 0.6) {
-                updateValidationStatus('photo', 'valid', 'Fotos validadas correctamente');
-                alert('¡Identidad validada con éxito!');
-                window.location.href = '/votacion';
-            } else {
-                updateValidationStatus('photo', 'invalid', 'Las fotos no coinciden');
-                alert('La validación de identidad falló. Las fotos no corresponden a la misma persona.');
-            }
-        } catch (error) {
-            console.error('Error en la validación:', error);
-            alert('Ocurrió un error durante la validación. Por favor, intente nuevamente.');
         } finally {
-            const validateButton = document.querySelector('.validate-button') as HTMLButtonElement;
             validateButton.disabled = false;
             validateButton.textContent = 'Validarme';
         }
@@ -405,6 +467,8 @@
         await loadModules();
         await loadModels();
         setupEventListeners();
+        await initializeQR();
+        initializeSocket();
         console.log('Inicialización completada');
     }
 
@@ -627,5 +691,55 @@
     .status-text {
         font-size: 0.9rem;
         color: #666;
+    }
+
+    .qr-container {
+        text-align: center;
+        margin: 2rem 0;
+        padding: 1rem;
+        background: #f5f5f5;
+        border-radius: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    #qrcode {
+        background: white;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin: 1rem 0;
+    }
+
+    .qr-instructions {
+        margin-top: 1rem;
+        color: #666;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+
+    .mobile-status {
+        text-align: center;
+        margin: 1rem 0;
+        padding: 1rem;
+        background: #e8f5e9;
+        border-radius: 0.5rem;
+        color: #2e7d32;
+    }
+
+    .loading-spinner {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #2e7d32;
+        border-radius: 50%;
+        margin: 1rem auto;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
 </style> 

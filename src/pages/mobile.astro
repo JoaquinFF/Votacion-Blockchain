@@ -1,0 +1,251 @@
+<div class="container">
+    <h1>Captura de Fotos</h1>
+
+    <div class="photo-container">
+        <div id="dni-section" class="photo-section">
+            <h2>Foto del DNI</h2>
+            <video id="dni-camera" autoplay playsinline></video>
+            <button id="capture-dni" class="capture-button">Capturar DNI</button
+            >
+        </div>
+
+        <div id="selfie-section" class="photo-section" style="display: none;">
+            <h2>Selfie</h2>
+            <video id="selfie-camera" autoplay playsinline></video>
+            <button id="capture-selfie" class="capture-button"
+                >Tomar Selfie</button
+            >
+        </div>
+
+        <div id="preview-section" class="photo-section" style="display: none;">
+            <h2>Vista Previa</h2>
+            <div class="preview-images">
+                <div class="preview-item">
+                    <h3>DNI</h3>
+                    <img id="dni-preview" src="" alt="DNI Preview" />
+                </div>
+                <div class="preview-item">
+                    <h3>Selfie</h3>
+                    <img id="selfie-preview" src="" alt="Selfie Preview" />
+                </div>
+            </div>
+            <button id="send-photos" class="send-button">Enviar Fotos</button>
+            <button id="retake-photos" class="retake-button"
+                >Volver a Tomar</button
+            >
+        </div>
+    </div>
+</div>
+
+<script>
+    import { io } from "socket.io-client";
+
+    let socket;
+    let sessionId;
+    let dniStream = null;
+    let selfieStream = null;
+    let dniImage = null;
+    let selfieImage = null;
+
+    // Inicializar Socket.IO
+    function initializeSocket() {
+        const urlParams = new URLSearchParams(window.location.search);
+        sessionId = urlParams.get("sessionId");
+
+        if (!sessionId) {
+            alert("Error: No se encontró el ID de sesión");
+            return;
+        }
+
+        socket = io(window.location.origin);
+
+        socket.on("connect", () => {
+            socket.emit("join-session", sessionId);
+        });
+    }
+
+    // Inicializar cámara
+    async function initializeCamera(videoElement, facingMode = "environment") {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Tu navegador no soporta acceso a la cámara');
+            return null;
+            }
+            console.log('Intentando acceder a la cámara...');
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode },
+            });
+
+            videoElement.srcObject = stream;
+            return stream;
+        } catch (error) {
+            console.error("Error al acceder a la cámara:", error);
+            alert("No se pudo acceder a la cámara" + error);
+            return null;
+        }
+    }
+
+    // Capturar foto
+    function capturePhoto(videoElement) {
+        const canvas = document.createElement("canvas");
+        canvas.width = videoElement.videoWidth;
+        canvas.height = videoElement.videoHeight;
+        const ctx = canvas.getContext("2d");
+
+        ctx.drawImage(videoElement, 0, 0);
+        return canvas.toDataURL("image/jpeg");
+    }
+
+    // Detener cámara
+    function stopCamera(stream) {
+        if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+        }
+    }
+
+    // Event Listeners
+    document.addEventListener("DOMContentLoaded", async () => {
+        initializeSocket();
+
+        const dniCamera = document.getElementById("dni-camera");
+        const selfieCamera = document.getElementById("selfie-camera");
+        const captureDniBtn = document.getElementById("capture-dni");
+        const captureSelfieBtn = document.getElementById("capture-selfie");
+        const sendPhotosBtn = document.getElementById("send-photos");
+        const retakePhotosBtn = document.getElementById("retake-photos");
+
+        // Inicializar cámara DNI
+        dniStream = await initializeCamera(dniCamera);
+
+        // Capturar DNI
+        captureDniBtn.addEventListener("click", () => {
+            dniImage = capturePhoto(dniCamera);
+            (document.getElementById("dni-preview") as HTMLImageElement).src =
+                dniImage;
+
+            // Cambiar a cámara frontal para selfie
+            stopCamera(dniStream);
+            document.getElementById("dni-section").style.display = "none";
+            document.getElementById("selfie-section").style.display = "block";
+
+            // Inicializar cámara selfie
+            initializeCamera(selfieCamera, "user").then((stream) => {
+                selfieStream = stream;
+            });
+        });
+
+        // Capturar Selfie
+        captureSelfieBtn.addEventListener("click", () => {
+            selfieImage = capturePhoto(selfieCamera);
+            (
+                document.getElementById("selfie-preview") as HTMLImageElement
+            ).src = selfieImage;
+
+            // Mostrar vista previa
+            stopCamera(selfieStream);
+            document.getElementById("selfie-section").style.display = "none";
+            document.getElementById("preview-section").style.display = "block";
+        });
+
+        // Enviar fotos
+        sendPhotosBtn.addEventListener("click", () => {
+            if (dniImage && selfieImage) {
+                socket.emit("mobile-photos", {
+                    dniImage,
+                    selfieImage,
+                });
+                alert("Fotos enviadas correctamente");
+                window.close();
+            }
+        });
+
+        // Volver a tomar fotos
+        retakePhotosBtn.addEventListener("click", () => {
+            document.getElementById("preview-section").style.display = "none";
+            document.getElementById("dni-section").style.display = "block";
+
+            // Reiniciar cámara DNI
+            initializeCamera(dniCamera).then((stream) => {
+                dniStream = stream;
+            });
+        });
+    });
+</script>
+
+<style>
+    .container {
+        max-width: 100%;
+        padding: 1rem;
+        margin: 0 auto;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .photo-section {
+        margin-bottom: 2rem;
+    }
+
+    video {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+        display: block;
+        border-radius: 0.5rem;
+    }
+
+    .capture-button,
+    .send-button,
+    .retake-button {
+        display: block;
+        width: 100%;
+        max-width: 400px;
+        margin: 1rem auto;
+        padding: 1rem;
+        border: none;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+
+    .capture-button {
+        background-color: #4a90e2;
+        color: white;
+    }
+
+    .send-button {
+        background-color: #2e7d32;
+        color: white;
+    }
+
+    .retake-button {
+        background-color: #666;
+        color: white;
+    }
+
+    .preview-images {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .preview-item {
+        text-align: center;
+    }
+
+    .preview-item img {
+        width: 100%;
+        border-radius: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    h2,
+    h3 {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+</style>
+
