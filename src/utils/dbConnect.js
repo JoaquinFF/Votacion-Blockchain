@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = 'mongodb+srv://Admin:root@cluster0.twf04.mongodb.net/VotacionBlockchain';
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  throw new Error(
+    'Por favor define la variable de entorno MONGODB_URI en tu archivo .env.local'
+  );
+}
 
 let cached = global.mongoose;
 
