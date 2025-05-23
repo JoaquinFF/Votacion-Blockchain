@@ -174,7 +174,7 @@
     // Inicializar QR
     async function initializeQR() {
         sessionId = generateSessionId();
-        const qrData = `http://192.168.1.37:4321/mobile?sessionId=${sessionId}`;
+        const qrData = `http://votacionblockchain.vercel.app/mobile?sessionId=${sessionId}`;
         
         try {
             const qrElement = document.getElementById('qrcode');
