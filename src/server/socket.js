@@ -41,8 +41,10 @@ io.on('connection', (socket) => {
 
             // 3. Notificar el resultado a la PC
             if (validacionExitosa) {
+                console.log('Validación exitosa');
                 io.to(sessionId).emit('validation-success');
             } else {
+                console.log('Validación fallida');
                 io.to(sessionId).emit('validation-failed');
             }
         }
