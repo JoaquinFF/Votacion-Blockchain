@@ -76,8 +76,8 @@
     console.log('Script iniciando...');
 
     // Importaciones dinámicas
-    let Tesseract;
-    let faceapi;
+    let Tesseract: any;
+    let faceapi: any;
     import { toCanvas } from 'qrcode';
     import { io } from 'socket.io-client';
 
@@ -93,14 +93,14 @@
     }
 
     // Variables globales
-    let currentPhotoType = null;
-    let stream = null;
-    let dniImage = null;
-    let selfieImage = null;
+    let currentPhotoType: any = null;
+    let stream: any = null;
+    let dniImage: any = null;
+    let selfieImage: any = null;
     let dniNumber = '';
     let modelsLoaded = false;
-    let socket;
-    let sessionId;
+    let socket: ReturnType<typeof io>;
+    let sessionId: string;
 
     // Cargar modelos de face-api
     async function loadModels() {
@@ -208,11 +208,14 @@
 
         socket.on('connect', () => {
             console.log('Conectado al servidor');
+            socket.emit('join-session', sessionId);
         });
 
         socket.on('mobile-connected', () => {
-            document.getElementById('mobile-status').style.display = 'block';
-            document.getElementById('qr-container').style.display = 'none';
+            const mobileStatus = document.getElementById('mobile-status');
+            const qrContainer = document.getElementById('qr-container');
+            if (mobileStatus) mobileStatus.style.display = 'block';
+            if (qrContainer) qrContainer.style.display = 'none';
         });
 
         socket.on('photos-received', async (data) => {
@@ -220,16 +223,70 @@
             selfieImage = data.selfieImage;
             
             // Actualizar estado visual
-            document.getElementById('dni-status').querySelector('.status-icon').textContent = '✅';
-            document.getElementById('photo-status').querySelector('.status-icon').textContent = '✅';
+            const dniStatus = document.getElementById('dni-status');
+            const photoStatus = document.getElementById('photo-status');
+            const dniIcon = dniStatus?.querySelector('.status-icon');
+            const photoIcon = photoStatus?.querySelector('.status-icon');
+            
+            if (dniIcon) dniIcon.textContent = '✅';
+            if (photoIcon) photoIcon.textContent = '✅';
             
             // Habilitar botón de validación
             (document.querySelector('.validate-button') as HTMLButtonElement).disabled = false;
         });
 
+        // Escuchar resultados de validación desde móvil
+        socket.on('validation-result', (data) => {
+            console.log('Resultado de validación recibido:', data);
+            
+            if (data.success) {
+                // Validación exitosa
+                updateValidationStatus('dni', 'valid', `DNI ${data.userData.dni} validado`);
+                updateValidationStatus('photo', 'valid', 'Identidad facial verificada');
+                
+                // Mostrar mensaje de éxito y redireccionar
+                setTimeout(() => {
+                    alert(`¡Bienvenido, ${data.userData.nombre}! Identidad validada exitosamente.`);
+                    window.location.href = '/votacion';
+                }, 1000);
+                
+            } else {
+                // Validación fallida
+                let statusType: 'dni' | 'photo' = 'photo';
+                
+                switch (data.type) {
+                    case 'dni-not-found':
+                        statusType = 'dni';
+                        updateValidationStatus('dni', 'invalid', 'DNI no encontrado');
+                        break;
+                    case 'no-face-detected':
+                        updateValidationStatus('photo', 'invalid', 'No se detectó rostro');
+                        break;
+                    case 'validation-failed':
+                        updateValidationStatus('photo', 'invalid', 'Rostro no coincide');
+                        break;
+                    case 'no-face-descriptor':
+                        updateValidationStatus('photo', 'invalid', 'Usuario sin registro facial');
+                        break;
+                    case 'server-error':
+                        updateValidationStatus('photo', 'invalid', 'Error del servidor');
+                        break;
+                    default:
+                        updateValidationStatus('photo', 'invalid', 'Error de validación');
+                }
+                
+                // Mostrar mensaje de error
+                setTimeout(() => {
+                    alert(`Error en la validación: ${data.message}`);
+                }, 1000);
+            }
+        });
+
         socket.on('disconnect', () => {
-            document.getElementById('mobile-status').style.display = 'none';
-            document.getElementById('qr-container').style.display = 'block';
+            const mobileStatus = document.getElementById('mobile-status');
+            const qrContainer = document.getElementById('qr-container');
+            if (mobileStatus) mobileStatus.style.display = 'none';
+            if (qrContainer) qrContainer.style.display = 'block';
         });
     }
 
@@ -282,7 +339,7 @@
                 imageData,
                 'spa', // Idioma español
                 {
-                    logger: m => console.log(m)
+                    logger: (m: any) => console.log(m)
                 }
             );
             return result.data.text;
@@ -303,7 +360,8 @@
             const video = document.getElementById('camera-preview') as HTMLVideoElement;
             if (video) {
                 video.srcObject = stream;
-                document.getElementById('camera-container').style.display = 'block';
+                const cameraContainer = document.getElementById('camera-container');
+                if (cameraContainer) cameraContainer.style.display = 'block';
                 currentPhotoType = photoType;
             }
         } catch (error) {
@@ -339,10 +397,12 @@
 
                 // Detener la cámara y ocultar el contenedor
                 if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
+                    stream.getTracks().forEach((track: any) => track.stop());
                 }
-                document.getElementById('camera-container').style.display = 'none';
-                document.getElementById('preview-container').style.display = 'block';
+                const cameraContainer = document.getElementById('camera-container');
+                const previewContainer = document.getElementById('preview-container');
+                if (cameraContainer) cameraContainer.style.display = 'none';
+                if (previewContainer) previewContainer.style.display = 'block';
             }
         }
     }
@@ -364,7 +424,8 @@
                     const previewImage = document.getElementById('preview-image') as HTMLImageElement;
                     if (previewImage) {
                         previewImage.src = imageData;
-                        document.getElementById('preview-container').style.display = 'block';
+                        const previewContainer = document.getElementById('preview-container');
+                        if (previewContainer) previewContainer.style.display = 'block';
                         
                         // Guardar la imagen según el tipo
                         if (photoType === 'dni') {
@@ -383,15 +444,17 @@
     function cancelCamera() {
         console.log('Cancelando captura...');
         if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+            stream.getTracks().forEach((track: any) => track.stop());
         }
-        document.getElementById('camera-container').style.display = 'none';
+        const cameraContainer = document.getElementById('camera-container');
+        if (cameraContainer) cameraContainer.style.display = 'none';
     }
 
     // Función para volver a tomar la foto
     function retakePhoto() {
         console.log('Volviendo a tomar foto...');
-        document.getElementById('preview-container').style.display = 'none';
+        const previewContainer = document.getElementById('preview-container');
+        if (previewContainer) previewContainer.style.display = 'none';
     }
 
     // Función para configurar los event listeners

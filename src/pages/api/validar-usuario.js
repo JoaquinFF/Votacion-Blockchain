@@ -1,13 +1,11 @@
-import mongoose from 'mongoose';
+import dbConnect from '../../utils/dbConnect';
 import { Usuario } from '../../models/Usuario';
 import * as faceapi from 'face-api.js';
 
-const MONGODB_URI = 'mongodb+srv://Admin:root@cluster0.twf04.mongodb.net/';
-
 export async function post({ request }) {
     try {
-        // Conectar a MongoDB
-        await mongoose.connect(MONGODB_URI);
+        // Conectar a MongoDB usando la conexión optimizada
+        await dbConnect();
         
         const { dni, selfieImage } = await request.json();
 
@@ -68,7 +66,5 @@ export async function post({ request }) {
         }), {
             status: 500
         });
-    } finally {
-        await mongoose.disconnect();
     }
 } 

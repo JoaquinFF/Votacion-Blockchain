@@ -29,10 +29,22 @@
                     <img id="selfie-preview" src="" alt="Selfie Preview" />
                 </div>
             </div>
-            <button id="send-photos" class="send-button">Enviar Fotos</button>
+            <button id="send-photos" class="send-button">Validar Identidad</button>
             <button id="retake-photos" class="retake-button"
                 >Volver a Tomar</button
             >
+        </div>
+
+        <div id="processing-section" class="photo-section" style="display: none;">
+            <h2>Procesando...</h2>
+            <div class="loading-spinner"></div>
+            <p id="processing-message">Extrayendo información del DNI y validando identidad...</p>
+        </div>
+
+        <div id="result-section" class="photo-section" style="display: none;">
+            <h2 id="result-title">Resultado</h2>
+            <p id="result-message"></p>
+            <button id="close-app" class="send-button">Cerrar</button>
         </div>
     </div>
 </div>
@@ -40,12 +52,99 @@
 <script>
     import { io } from "socket.io-client";
 
-    let socket;
-    let sessionId;
-    let dniStream = null;
-    let selfieStream = null;
-    let dniImage = null;
-    let selfieImage = null;
+    let socket: any;
+    let sessionId: any = null;
+    let dniStream: any = null;
+    let selfieStream: any = null;
+    let dniImage: any = null;
+    let selfieImage: any = null;
+    let Tesseract: any;
+
+    // Cargar Tesseract dinámicamente
+    async function loadTesseract() {
+        if (!Tesseract) {
+            Tesseract = await import('tesseract.js');
+        }
+    }
+
+    // Extraer DNI de la imagen
+    async function extractDNI(imageData: string) {
+        try {
+            await loadTesseract();
+            
+            updateProcessingMessage("Analizando imagen del DNI...");
+            
+            const { data: { text } } = await Tesseract.recognize(imageData, 'spa', {
+                logger: (m: any) => {
+                    if (m.status === 'recognizing text') {
+                        const progress = Math.round(m.progress * 100);
+                        updateProcessingMessage(`Analizando DNI: ${progress}%`);
+                    }
+                }
+            });
+
+            // Buscar patrones de DNI en el texto extraído
+            const dniPatterns = [
+                /DNI\s*:?\s*(\d{1,3}\.?\d{3}\.?\d{3})/i,
+                /DOCUMENTO\s*:?\s*(\d{1,3}\.?\d{3}\.?\d{3})/i,
+                /(\d{1,3}\.?\d{3}\.?\d{3})/g,
+                /(\d{8})/g
+            ];
+
+            for (const pattern of dniPatterns) {
+                const matches = text.match(pattern);
+                if (matches) {
+                    // Limpiar el DNI (quitar puntos y espacios)
+                    const dni = matches[1] || matches[0];
+                    const cleanDNI = dni.replace(/[^\d]/g, '');
+                    
+                    // Validar que tenga entre 7 y 8 dígitos
+                    if (cleanDNI.length >= 7 && cleanDNI.length <= 8) {
+                        return cleanDNI;
+                    }
+                }
+            }
+
+            throw new Error('No se pudo extraer el DNI de la imagen');
+        } catch (error) {
+            console.error('Error al extraer DNI:', error);
+            throw error;
+        }
+    }
+
+    // Actualizar mensaje de procesamiento
+    function updateProcessingMessage(message: string) {
+        const messageElement = document.getElementById('processing-message');
+        if (messageElement) {
+            messageElement.textContent = message;
+        }
+    }
+
+    // Mostrar resultado
+    function showResult(success: boolean, message: string, data = null) {
+        const processingSection = document.getElementById('processing-section');
+        const resultSection = document.getElementById('result-section');
+        
+        if (processingSection) processingSection.style.display = 'none';
+        if (resultSection) resultSection.style.display = 'block';
+        
+        const titleElement = document.getElementById('result-title');
+        const messageElement = document.getElementById('result-message');
+        
+        if (success) {
+            if (titleElement) {
+                titleElement.textContent = '✅ Validación Exitosa';
+                titleElement.style.color = '#2e7d32';
+            }
+            if (messageElement) messageElement.textContent = `¡Bienvenido! ${message}`;
+        } else {
+            if (titleElement) {
+                titleElement.textContent = '❌ Validación Fallida';
+                titleElement.style.color = '#c62828';
+            }
+            if (messageElement) messageElement.textContent = message;
+        }
+    }
 
     // Inicializar Socket.IO
     function initializeSocket() {
@@ -65,7 +164,7 @@
     }
 
     // Inicializar cámara
-    async function initializeCamera(videoElement, facingMode = "environment") {
+    async function initializeCamera(videoElement: any, facingMode = "environment") {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert('Tu navegador no soporta acceso a la cámara');
@@ -86,20 +185,23 @@
     }
 
     // Capturar foto
-    function capturePhoto(videoElement) {
+    function capturePhoto(videoElement: any) {
         const canvas = document.createElement("canvas");
         canvas.width = videoElement.videoWidth;
         canvas.height = videoElement.videoHeight;
         const ctx = canvas.getContext("2d");
 
-        ctx.drawImage(videoElement, 0, 0);
-        return canvas.toDataURL("image/jpeg");
+        if (ctx) {
+            ctx.drawImage(videoElement, 0, 0);
+            return canvas.toDataURL("image/jpeg");
+        }
+        return null;
     }
 
     // Detener cámara
-    function stopCamera(stream) {
+    function stopCamera(stream: any) {
         if (stream) {
-            stream.getTracks().forEach((track) => track.stop());
+            stream.getTracks().forEach((track: any) => track.stop());
         }
     }
 
@@ -113,20 +215,24 @@
         const captureSelfieBtn = document.getElementById("capture-selfie");
         const sendPhotosBtn = document.getElementById("send-photos");
         const retakePhotosBtn = document.getElementById("retake-photos");
+        const closeAppBtn = document.getElementById("close-app");
 
         // Inicializar cámara DNI
         dniStream = await initializeCamera(dniCamera);
 
         // Capturar DNI
-        captureDniBtn.addEventListener("click", () => {
+        captureDniBtn?.addEventListener("click", () => {
             dniImage = capturePhoto(dniCamera);
             (document.getElementById("dni-preview") as HTMLImageElement).src =
                 dniImage;
 
             // Cambiar a cámara frontal para selfie
             stopCamera(dniStream);
-            document.getElementById("dni-section").style.display = "none";
-            document.getElementById("selfie-section").style.display = "block";
+            const dniSection = document.getElementById("dni-section");
+            const selfieSection = document.getElementById("selfie-section");
+            
+            if (dniSection) dniSection.style.display = "none";
+            if (selfieSection) selfieSection.style.display = "block";
 
             // Inicializar cámara selfie
             initializeCamera(selfieCamera, "user").then((stream) => {
@@ -135,7 +241,7 @@
         });
 
         // Capturar Selfie
-        captureSelfieBtn.addEventListener("click", () => {
+        captureSelfieBtn?.addEventListener("click", () => {
             selfieImage = capturePhoto(selfieCamera);
             (
                 document.getElementById("selfie-preview") as HTMLImageElement
@@ -143,31 +249,79 @@
 
             // Mostrar vista previa
             stopCamera(selfieStream);
-            document.getElementById("selfie-section").style.display = "none";
-            document.getElementById("preview-section").style.display = "block";
+            const selfieSection = document.getElementById("selfie-section");
+            const previewSection = document.getElementById("preview-section");
+            
+            if (selfieSection) selfieSection.style.display = "none";
+            if (previewSection) previewSection.style.display = "block";
         });
 
-        // Enviar fotos
-        sendPhotosBtn.addEventListener("click", () => {
-            if (dniImage && selfieImage) {
-                socket.emit("mobile-photos", {
-                    dniImage,
-                    selfieImage,
+        // Validar identidad
+        sendPhotosBtn?.addEventListener("click", async () => {
+            if (!dniImage || !selfieImage) {
+                alert("Faltan imágenes por capturar");
+                return;
+            }
+
+            // Mostrar pantalla de procesamiento
+            const previewSection = document.getElementById("preview-section");
+            const processingSection = document.getElementById("processing-section");
+            
+            if (previewSection) previewSection.style.display = "none";
+            if (processingSection) processingSection.style.display = "block";
+
+            try {
+                // Extraer DNI de la imagen
+                updateProcessingMessage("Extrayendo número de DNI...");
+                const extractedDNI = await extractDNI(dniImage);
+                
+                updateProcessingMessage("DNI extraído. Validando identidad...");
+                
+                // Enviar datos al servidor para validación
+                const response = await fetch('/api/validar-mobile', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        dni: extractedDNI,
+                        selfieImage: selfieImage,
+                        sessionId: sessionId
+                    })
                 });
-                alert("Fotos enviadas correctamente");
-                window.close();
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult(true, `Identidad validada para ${result.userData?.nombre || 'usuario'}`);
+                } else {
+                    showResult(false, result.message);
+                }
+
+            } catch (error) {
+                console.error('Error en la validación:', error);
+                const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+                showResult(false, 'Error al procesar las imágenes: ' + errorMessage);
             }
         });
 
         // Volver a tomar fotos
-        retakePhotosBtn.addEventListener("click", () => {
-            document.getElementById("preview-section").style.display = "none";
-            document.getElementById("dni-section").style.display = "block";
+        retakePhotosBtn?.addEventListener("click", () => {
+            const previewSection = document.getElementById("preview-section");
+            const dniSection = document.getElementById("dni-section");
+            
+            if (previewSection) previewSection.style.display = "none";
+            if (dniSection) dniSection.style.display = "block";
 
             // Reiniciar cámara DNI
             initializeCamera(dniCamera).then((stream) => {
                 dniStream = stream;
             });
+        });
+
+        // Cerrar aplicación
+        closeAppBtn?.addEventListener("click", () => {
+            window.close();
         });
     });
 </script>
@@ -246,6 +400,46 @@
     h3 {
         text-align: center;
         margin-bottom: 1rem;
+    }
+
+    /* Estilos para las nuevas secciones */
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #4a90e2;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 2rem auto;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    #processing-message {
+        text-align: center;
+        font-size: 1rem;
+        color: #666;
+        margin-top: 1rem;
+    }
+
+    #result-section {
+        text-align: center;
+        padding: 2rem;
+    }
+
+    #result-title {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        font-weight: bold;
+    }
+
+    #result-message {
+        font-size: 1rem;
+        margin-bottom: 2rem;
+        line-height: 1.5;
     }
 </style>
 
