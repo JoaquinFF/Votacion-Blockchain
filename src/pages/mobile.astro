@@ -277,6 +277,31 @@
                 
                 updateProcessingMessage("DNI extraído. Validando identidad...");
                 
+                // Convertir las imágenes base64 a Blob
+                const dniBlob = await fetch(dniImage).then(r => r.blob());
+                const selfieBlob = await fetch(selfieImage).then(r => r.blob());
+
+                // Crear FormData para enviar las imágenes
+                const formData = new FormData();
+                formData.append('dni', dniBlob, 'dni.jpg');
+                formData.append('selfie', selfieBlob, 'selfie.jpg');
+
+                // Llamar a la API de reconocimiento facial
+                const faceRecognitionResponse = await fetch('https://api-face-recognition-production.up.railway.app/compare', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const faceRecognitionResult = await faceRecognitionResponse.json();
+                
+                // Si la similitud es menor a 0.5, consideramos que es la misma persona
+                const isMatch = faceRecognitionResult.similarity < 0.5;
+
+                if (!isMatch) {
+                    showResult(false, 'La foto del DNI no coincide con la selfie. Por favor, intente nuevamente.');
+                    return;
+                }
+
                 // Enviar datos al servidor para validación
                 const response = await fetch('/api/validar-mobile', {
                     method: 'POST',
