@@ -1,7 +1,9 @@
 {
   "name": "hardhat-project",
   "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/qrcode": "^1.5.5",
     "hardhat": "^2.24.0"
   }
 }

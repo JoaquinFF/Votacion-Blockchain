@@ -72,4 +72,12 @@
     .vote-button:hover {
         background-color: #357ABD;
     }
-</style> 
+</style>
+
+<script>
+    document.querySelectorAll('.vote-button').forEach(button => {
+        button.addEventListener('click', () => {
+            window.location.href = '/votacion';
+        });
+    });
+</script> 

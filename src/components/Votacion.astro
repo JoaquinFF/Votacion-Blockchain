@@ -11,7 +11,7 @@
                     <span class="candidate-name">Javier Milei</span>
                     <span class="party-name">La Libertad Avanza</span>
                 </div>
-                <button class="vote-button">Ver Lista</button>
+                <button class="view-list-button" data-candidate="1">Ver Lista</button>
             </div>
             
             <div class="candidate">
@@ -20,7 +20,7 @@
                     <span class="candidate-name">Sergio Massa</span>
                     <span class="party-name">Unión por la Patria</span>
                 </div>
-                <button class="vote-button">Ver Lista</button>
+                <button class="view-list-button" data-candidate="2">Ver Lista</button>
             </div>
         </div>
     </div>
@@ -89,7 +89,7 @@
         font-size: 0.9rem;
     }
 
-    .vote-button {
+    .view-list-button {
         padding: 0.5rem 1.5rem;
         background-color: #4A90E2;
         color: white;
@@ -98,7 +98,16 @@
         cursor: pointer;
     }
 
-    .vote-button:hover {
+    .view-list-button:hover {
         background-color: #357ABD;
     }
-</style> 
+</style>
+
+<script>
+    document.querySelectorAll('.view-list-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const candidateId = button.getAttribute('data-candidate');
+            window.location.href = `/confirmacion?candidate=${candidateId}`;
+        });
+    });
+</script> 

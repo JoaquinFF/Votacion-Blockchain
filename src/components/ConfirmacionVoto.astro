@@ -107,4 +107,84 @@
     .vote-button:hover {
         background-color: #357ABD;
     }
-</style> 
+
+    .vote-button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+    }
+</style>
+
+<script>
+    import { ethers } from 'ethers';
+    import type { Voting } from '../../contracts/typechain-types';
+    import { abi } from '../../contracts/artifacts/contracts/Voting.sol/Voting.json';
+
+    declare global {
+        interface Window {
+            ethereum: any;
+        }
+    }
+
+    let votingContract: any;
+    let provider: any;
+    let signer: any;
+
+    async function initializeContract() {
+        try {
+            if (typeof window.ethereum !== 'undefined') {
+                // Solicitar conexión a MetaMask
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+                
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                
+                const contractAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
+                votingContract = new ethers.Contract(contractAddress, abi, signer);
+                return true;
+            } else {
+                alert('Por favor, instala MetaMask para votar');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error al inicializar el contrato:', error);
+            alert('Error al conectar con la blockchain');
+            return false;
+        }
+    }
+
+    async function handleVote() {
+        try {
+            const voteButton = document.querySelector('.vote-button') as HTMLButtonElement;
+            if (voteButton) {
+                voteButton.disabled = true;
+                voteButton.textContent = 'Procesando voto...';
+            }
+
+            const initialized = await initializeContract();
+            if (!initialized) {
+                throw new Error('No se pudo inicializar el contrato');
+            }
+
+            // Obtener el ID del candidato de la URL o localStorage
+            const candidateId = 1; // Por ahora hardcodeado, deberías obtenerlo de donde corresponda
+            const tx = await votingContract.vote(candidateId);
+            await tx.wait();
+
+            window.location.href = '/voto-registrado';
+        } catch (error) {
+            console.error('Error al votar:', error);
+            alert('Error al procesar tu voto');
+            
+            const voteButton = document.querySelector('.vote-button') as HTMLButtonElement;
+            if (voteButton) {
+                voteButton.disabled = false;
+                voteButton.textContent = 'Votar';
+            }
+        }
+    }
+
+    const voteButton = document.querySelector('.vote-button');
+    if (voteButton) {
+        voteButton.addEventListener('click', handleVote);
+    }
+</script> 
