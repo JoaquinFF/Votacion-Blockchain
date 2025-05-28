@@ -116,14 +116,183 @@
 
 <script>
     import { ethers } from 'ethers';
-    import type { Voting } from '../../contracts/typechain-types';
-    import { abi } from '../../contracts/artifacts/contracts/Voting.sol/Voting.json';
 
     declare global {
         interface Window {
             ethereum: any;
         }
     }
+
+    // ABI del contrato
+    const contractABI = [
+        {
+            "inputs": [],
+            "stateMutability": "nonpayable",
+            "type": "constructor"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "string",
+                    "name": "_name",
+                    "type": "string"
+                }
+            ],
+            "name": "addCandidate",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "admin",
+            "outputs": [
+                {
+                    "internalType": "address",
+                    "name": "",
+                    "type": "address"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "name": "candidates",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "id",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "string",
+                    "name": "name",
+                    "type": "string"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "voteCount",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "candidatesCount",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "electionActive",
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "endElection",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_id",
+                    "type": "uint256"
+                }
+            ],
+            "name": "getCandidate",
+            "outputs": [
+                {
+                    "internalType": "string",
+                    "name": "",
+                    "type": "string"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "_voter",
+                    "type": "address"
+                }
+            ],
+            "name": "registerVoter",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_candidateId",
+                    "type": "uint256"
+                }
+            ],
+            "name": "vote",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "",
+                    "type": "address"
+                }
+            ],
+            "name": "voters",
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "registered",
+                    "type": "bool"
+                },
+                {
+                    "internalType": "bool",
+                    "name": "hasVoted",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        }
+    ];
 
     let votingContract: any;
     let provider: any;
@@ -138,8 +307,32 @@
                 provider = new ethers.BrowserProvider(window.ethereum);
                 signer = await provider.getSigner();
                 
-                const contractAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
-                votingContract = new ethers.Contract(contractAddress, abi, signer);
+                const contractAddress = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707";
+                console.log("Inicializando contrato en:", contractAddress);
+                
+                votingContract = new ethers.Contract(contractAddress, contractABI, signer);
+                console.log("Contrato inicializado");
+
+                // Verificar la cuenta conectada
+                const accounts = await provider.listAccounts();
+                const currentAccount = accounts[0];
+                console.log("Cuenta conectada:", currentAccount);
+
+                // Verificar la red
+                const network = await provider.getNetwork();
+                console.log("Red conectada:", network);
+
+                // Verificar si el contrato está desplegado
+                const code = await provider.getCode(contractAddress);
+                console.log("Código del contrato:", code.slice(0, 66) + "...");
+                if (code === '0x') {
+                    throw new Error("El contrato no está desplegado en esta dirección");
+                }
+
+                // Verificar si la cuenta está registrada
+                const voterInfo = await votingContract.voters(currentAccount);
+                console.log("Información del votante:", voterInfo);
+
                 return true;
             } else {
                 alert('Por favor, instala MetaMask para votar');
@@ -165,15 +358,20 @@
                 throw new Error('No se pudo inicializar el contrato');
             }
 
-            // Obtener el ID del candidato de la URL o localStorage
-            const candidateId = 1; // Por ahora hardcodeado, deberías obtenerlo de donde corresponda
+            // Obtener el ID del candidato de la URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const candidateId = parseInt(urlParams.get('candidate') || '1');
+            console.log("Votando por candidato:", candidateId);
+
             const tx = await votingContract.vote(candidateId);
+            console.log("Transacción enviada:", tx.hash);
             await tx.wait();
+            console.log("Transacción confirmada");
 
             window.location.href = '/voto-registrado';
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error al votar:', error);
-            alert('Error al procesar tu voto');
+            alert(`Error al procesar tu voto: ${error.message || 'Error desconocido'}`);
             
             const voteButton = document.querySelector('.vote-button') as HTMLButtonElement;
             if (voteButton) {

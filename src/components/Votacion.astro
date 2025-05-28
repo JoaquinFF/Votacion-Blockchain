@@ -1,27 +1,15 @@
+---
+// Frontmatter vacío ya que toda la lógica está en el script
+---
+
 <div class="container">
     <h1>Sistema de Votación de la Nación</h1>
     
     <div class="voting-card">
         <h2>Votación</h2>
         
-        <div class="candidates">
-            <div class="candidate">
-                <img src="/src/assets/images/milei.png" alt="Javier Milei" class="candidate-image" />
-                <div class="candidate-info">
-                    <span class="candidate-name">Javier Milei</span>
-                    <span class="party-name">La Libertad Avanza</span>
-                </div>
-                <button class="view-list-button" data-candidate="1">Ver Lista</button>
-            </div>
-            
-            <div class="candidate">
-                <img src="/src/assets/images/massa.png" alt="Sergio Massa" class="candidate-image" />
-                <div class="candidate-info">
-                    <span class="candidate-name">Sergio Massa</span>
-                    <span class="party-name">Unión por la Patria</span>
-                </div>
-                <button class="view-list-button" data-candidate="2">Ver Lista</button>
-            </div>
+        <div id="candidates-container" class="candidates">
+            <!-- Los candidatos se cargarán dinámicamente aquí -->
         </div>
     </div>
 </div>
@@ -104,10 +92,134 @@
 </style>
 
 <script>
-    document.querySelectorAll('.view-list-button').forEach(button => {
-        button.addEventListener('click', () => {
-            const candidateId = button.getAttribute('data-candidate');
-            window.location.href = `/confirmacion?candidate=${candidateId}`;
-        });
-    });
+    // Importaciones
+    import { ethers } from 'ethers';
+    import contractABI from '../contracts/Voting.json';
+
+    // Configuración
+    const contractAddress = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707";
+    
+    // Interfaces
+    interface Candidate {
+        id: number;
+        name: string;
+        image: string;
+        partyName: string;
+    }
+    
+    interface CandidateImage {
+        image: string;
+        partyName: string;
+    }
+    
+    // Datos de imágenes de candidatos
+    const candidateImages: Record<string, CandidateImage> = {
+        "La Libertad Avanza": {
+            image: "/src/assets/images/milei.png",
+            partyName: "La Libertad Avanza"
+        },
+        "Unión por la Patria": {
+            image: "/src/assets/images/massa.png",
+            partyName: "Unión por la Patria"
+        }
+    };
+
+    // Función principal para cargar candidatos
+    async function loadCandidates() {
+        try {
+            // Verificar si MetaMask está instalado
+            if (!window.ethereum) {
+                throw new Error("Por favor, instala MetaMask para usar esta aplicación");
+            }
+
+            // Conectar con MetaMask
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            
+            // Obtener la cuenta conectada
+            const accounts = await provider.listAccounts();
+            const currentAccount = accounts[0];
+            console.log("Cuenta conectada:", currentAccount);
+            
+            // Verificar la conexión a la red
+            const network = await provider.getNetwork();
+            console.log("Conectado a la red:", network);
+            console.log("Chain ID:", network.chainId);
+
+            // Crear instancia del contrato
+            const contract = new ethers.Contract(contractAddress, contractABI.abi, provider);
+            
+            // Verificar que el contrato está desplegado
+            const code = await provider.getCode(contractAddress);
+            console.log("Código del contrato:", code.slice(0, 66) + "...");
+            if (code === '0x') {
+                throw new Error("El contrato no está desplegado en esta dirección");
+            }
+
+            // Verificar si la cuenta está registrada
+            const voterInfo = await contract.voters(currentAccount);
+            console.log("Información del votante:", voterInfo);
+
+            // Obtener número de candidatos
+            const candidatesCount = await contract.candidatesCount();
+            console.log("Número de candidatos:", candidatesCount);
+            
+            // Obtener contenedor
+            const candidatesContainer = document.getElementById('candidates-container');
+            if (!candidatesContainer) {
+                throw new Error("No se encontró el contenedor de candidatos");
+            }
+            
+            // Limpiar contenedor
+            candidatesContainer.innerHTML = '';
+            
+            // Cargar cada candidato
+            for (let i = 1; i <= candidatesCount; i++) {
+                const [name, voteCount] = await contract.getCandidate(i);
+                console.log(`Cargando candidato ${i}:`, name, voteCount);
+                
+                const imageInfo = candidateImages[name as keyof typeof candidateImages] || { 
+                    image: "/default-candidate.png", 
+                    partyName: name 
+                };
+                
+                // Crear elemento HTML
+                const candidateElement = document.createElement('div');
+                candidateElement.className = 'candidate';
+                candidateElement.innerHTML = `
+                    <img src="${imageInfo.image}" alt="${name}" class="candidate-image" />
+                    <div class="candidate-info">
+                        <span class="candidate-name">${name}</span>
+                        <span class="party-name">${imageInfo.partyName}</span>
+                    </div>
+                    <button class="view-list-button" data-candidate="${i}">Ver Lista</button>
+                `;
+                
+                candidatesContainer.appendChild(candidateElement);
+            }
+
+            // Agregar event listeners
+            document.querySelectorAll('.view-list-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const candidateId = button.getAttribute('data-candidate');
+                    if (candidateId) {
+                        window.location.href = `/confirmacion?candidate=${candidateId}`;
+                    }
+                });
+            });
+        } catch (error: any) {
+            console.error("Error al cargar candidatos:", error);
+            // Mostrar error al usuario
+            const candidatesContainer = document.getElementById('candidates-container');
+            if (candidatesContainer) {
+                candidatesContainer.innerHTML = `
+                    <div class="error-message">
+                        Error al cargar los candidatos: ${error.message || 'Error desconocido'}
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // Iniciar carga cuando el documento esté listo
+    document.addEventListener('DOMContentLoaded', loadCandidates);
 </script> 

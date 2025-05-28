@@ -4,26 +4,12 @@
     <div class="results-card">
         <h2>Resultados</h2>
         
-        <div class="results-list">
-            <div class="result-item">
-                <div class="party-info">
-                    <span>La Libertad Avanza</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress" style="width: 62%;"></div>
-                </div>
-                <span class="percentage">62%</span>
-            </div>
+        <div class="results-list" id="results-list">
+            <!-- Los resultados se cargarán dinámicamente -->
+        </div>
 
-            <div class="result-item">
-                <div class="party-info">
-                    <span>Unión por la Patria</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress" style="width: 38%;"></div>
-                </div>
-                <span class="percentage">38%</span>
-            </div>
+        <div class="total-votes">
+            <h3>Total de Votos: <span id="total-votes">0</span></h3>
         </div>
     </div>
 </div>
@@ -54,6 +40,7 @@
         display: flex;
         flex-direction: column;
         gap: 1.5rem;
+        margin-bottom: 2rem;
     }
 
     .result-item {
@@ -86,4 +73,92 @@
         text-align: right;
         font-weight: 500;
     }
-</style> 
+
+    .total-votes {
+        text-align: center;
+        padding-top: 1rem;
+        border-top: 1px solid #eee;
+    }
+
+    .total-votes h3 {
+        margin: 0;
+        color: #666;
+    }
+
+    .total-votes span {
+        color: #4A90E2;
+        font-weight: bold;
+    }
+</style>
+
+<script>
+    import { ethers } from 'ethers';
+    import type { Voting } from '../../contracts/typechain-types';
+    import { abi } from '../../contracts/artifacts/contracts/Voting.sol/Voting.json';
+
+    declare global {
+        interface Window {
+            ethereum: any;
+        }
+    }
+
+    const candidateInfo = {
+        1: { name: "La Libertad Avanza", color: "#4A90E2" },
+        2: { name: "Unión por la Patria", color: "#E24A4A" }
+    } as const;
+
+    async function loadResults() {
+        try {
+            if (typeof window.ethereum === 'undefined') {
+                alert('Por favor, instala MetaMask para ver los resultados');
+                return;
+            }
+
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+            const contract = new ethers.Contract(contractAddress, abi, provider);
+
+            // Obtener votos de cada candidato
+            const results = await Promise.all(
+                Object.keys(candidateInfo).map(async (id) => {
+                    const candidateId = parseInt(id) as 1 | 2;
+                    const candidate = await contract.getCandidate(candidateId);
+                    return {
+                        id: candidateId,
+                        name: candidateInfo[candidateId].name,
+                        votes: parseInt(candidate[1]),
+                        color: candidateInfo[candidateId].color
+                    };
+                })
+            );
+
+            // Calcular total de votos
+            const totalVotes = results.reduce((sum, candidate) => sum + candidate.votes, 0);
+            document.getElementById('total-votes')!.textContent = totalVotes.toString();
+
+            // Actualizar la UI
+            const resultsList = document.getElementById('results-list')!;
+            resultsList.innerHTML = results.map(candidate => `
+                <div class="result-item">
+                    <div class="party-info">
+                        <span>${candidate.name}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress" style="width: ${totalVotes > 0 ? (candidate.votes / totalVotes * 100) : 0}%; background-color: ${candidate.color};"></div>
+                    </div>
+                    <span class="percentage">${totalVotes > 0 ? Math.round(candidate.votes / totalVotes * 100) : 0}%</span>
+                </div>
+            `).join('');
+
+        } catch (error) {
+            console.error('Error al cargar resultados:', error);
+            alert('Error al cargar los resultados');
+        }
+    }
+
+    // Cargar resultados al iniciar
+    loadResults();
+
+    // Actualizar resultados cada 30 segundos
+    setInterval(loadResults, 30000);
+</script> 
