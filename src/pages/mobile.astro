@@ -44,7 +44,7 @@
         <div id="result-section" class="photo-section" style="display: none;">
             <h2 id="result-title">Resultado</h2>
             <p id="result-message"></p>
-            <button id="close-app" class="send-button">Cerrar</button>
+            <button id="close-app" class="send-button">Intentar otra vez</button>
         </div>
     </div>
 </div>
@@ -124,6 +124,7 @@
     function showResult(success: boolean, message: string, data = null) {
         const processingSection = document.getElementById('processing-section');
         const resultSection = document.getElementById('result-section');
+        const closeAppBtn = document.getElementById('close-app');
         
         if (processingSection) processingSection.style.display = 'none';
         if (resultSection) resultSection.style.display = 'block';
@@ -137,12 +138,25 @@
                 titleElement.style.color = '#2e7d32';
             }
             if (messageElement) messageElement.textContent = `¡Bienvenido! ${message}`;
+            if (closeAppBtn) {
+                closeAppBtn.style.display = 'none';
+                closeAppBtn.style.visibility = 'hidden';
+            }
+            
+            // Redirigir a la página de votación después de 2 segundos
+            setTimeout(() => {
+                window.location.href = '/votacion';
+            }, 2000);
         } else {
             if (titleElement) {
                 titleElement.textContent = '❌ Validación Fallida';
                 titleElement.style.color = '#c62828';
             }
             if (messageElement) messageElement.textContent = message;
+            if (closeAppBtn) {
+                closeAppBtn.style.display = 'block';
+                closeAppBtn.style.visibility = 'visible';
+            }
         }
     }
 
@@ -301,23 +315,11 @@
                     showResult(false, 'La foto del DNI no coincide con la selfie. Por favor, intente nuevamente.');
                     return;
                 }
-
-                // Enviar datos al servidor para validación
-                const response = await fetch('/api/validar-mobile', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        dni: extractedDNI,
-                        selfieImage: selfieImage,
-                        sessionId: sessionId
-                    })
-                });
-
-                const result = await response.json();
                 
-                if (result.success) {
-                    showResult(true, `Identidad validada para ${result.userData?.nombre || 'usuario'}`);
+                if (isMatch) {
+                    showResult(true, `Identidad validada`);
                 } else {
-                    showResult(false, result.message);
+                    showResult(false, 'No se pudo validar la identidad. Por favor, intente nuevamente.');
                 }
 
             } catch (error) {
@@ -343,7 +345,16 @@
 
         // Cerrar aplicación
         closeAppBtn?.addEventListener("click", () => {
-            window.close();
+            const resultSection = document.getElementById("result-section");
+            const dniSection = document.getElementById("dni-section");
+            
+            if (resultSection) resultSection.style.display = "none";
+            if (dniSection) dniSection.style.display = "block";
+
+            // Reiniciar cámara DNI
+            initializeCamera(dniCamera).then((stream) => {
+                dniStream = stream;
+            });
         });
     });
 </script>
