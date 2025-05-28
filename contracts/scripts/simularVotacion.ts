@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import type { Voting } from "../typechain-types";
 
 async function main() {
   // Obtener cuentas locales de Hardhat
@@ -8,7 +9,7 @@ async function main() {
   const contractAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
 
   // Obtener instancia del contrato
-  const Voting = await ethers.getContractAt("Voting", contractAddress);
+  const Voting = await ethers.getContractAt("Voting", contractAddress) as Voting;
 
   // Agregar candidatos desde cuenta admin
   await Voting.connect(admin).addCandidate("Candidato A");
