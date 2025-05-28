@@ -295,7 +295,7 @@
                 const faceRecognitionResult = await faceRecognitionResponse.json();
                 
                 // Si la similitud es menor a 0.5, consideramos que es la misma persona
-                const isMatch = faceRecognitionResult.similarity < 0.5;
+                const isMatch = faceRecognitionResult.distance < 0.6;
 
                 if (!isMatch) {
                     showResult(false, 'La foto del DNI no coincide con la selfie. Por favor, intente nuevamente.');
@@ -305,9 +305,6 @@
                 // Enviar datos al servidor para validación
                 const response = await fetch('/api/validar-mobile', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
                     body: JSON.stringify({
                         dni: extractedDNI,
                         selfieImage: selfieImage,
